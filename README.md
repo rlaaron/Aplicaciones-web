@@ -196,3 +196,171 @@ Para desplegar esta aplicación en un servidor web:
 - La aplicación crea automáticamente la base de datos si no existe
 - Se generan datos de ejemplo para los últimos 90 días si la base de datos está vacía
 - La visualización de datos agrupa los estados de ánimo por semanas
+
+## Proceso de Desarrollo
+
+### 1. Análisis y Planificación
+
+- **Análisis de Requisitos**: Se identificó la necesidad de una aplicación simple para el seguimiento del estado de ánimo diario
+- **Investigación de Usuario**: Se determinó que los usuarios necesitaban una interfaz intuitiva y visualizaciones claras
+- **Definición de Funcionalidades**: Registro diario, visualización histórica y análisis de tendencias
+- **Selección de Tecnologías**: PHP y SQLite por su simplicidad y facilidad de despliegue
+
+### 2. Diseño
+
+- **Arquitectura de la Aplicación**: Estructura MVC simplificada
+- **Diseño de Base de Datos**: Esquema simple con una tabla principal para los registros
+- **Wireframes**: Bocetos iniciales de la interfaz con enfoque mobile-first
+- **Diseño de UI/UX**: Sistema de pestañas, botones expresivos y paleta de colores adecuada
+
+### 3. Implementación
+
+- **Configuración del Entorno**: Preparación del entorno de desarrollo local con PHP y SQLite
+  ```bash
+  # Verificación de PHP y extensión SQLite
+  php -v
+  php -m | grep sqlite
+  ```
+
+- **Desarrollo Backend**: Creación de la base de datos, lógica de almacenamiento y recuperación de datos
+  ```php
+  // Creación de la estructura de la base de datos (index.php)
+  $db->exec("
+      CREATE TABLE IF NOT EXISTS registros (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          fecha DATE DEFAULT CURRENT_TIMESTAMP,
+          estado_animo TEXT NOT NULL
+      )
+  ");
+  
+  // Implementación de la API para obtener datos (data.php)
+  $result = $db->query("
+      SELECT 
+          strftime('%W/%Y', fecha) as week,
+          CASE 
+              WHEN (
+                  SUM(CASE WHEN estado_animo = '😊' THEN 1 ELSE 0 END) > 
+                  SUM(CASE WHEN estado_animo = '😐' THEN 1 ELSE 0 END) AND
+                  SUM(CASE WHEN estado_animo = '😊' THEN 1 ELSE 0 END) > 
+                  SUM(CASE WHEN estado_animo = '😞' THEN 1 ELSE 0 END)
+              ) THEN 2
+              ELSE /* lógica para otros casos */
+          END as predominant
+      FROM registros
+      WHERE fecha >= date('now', '-3 months')
+      GROUP BY strftime('%W/%Y', fecha)
+  ");
+  ```
+
+- **Desarrollo Frontend**: Implementación de la interfaz de usuario responsiva
+  ```html
+  <!-- Sistema de pestañas para la navegación (index.php) -->
+  <div class="tabs">
+      <button class="tab active" onclick="openTab('today')">Hoy</button>
+      <button class="tab" onclick="openTab('history')">Histórico</button>
+  </div>
+  ```
+  
+  ```css
+  /* Estilos responsivos (style.css) */
+  body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f0f2f5;
+  }
+  .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  ```
+
+- **Integración**: Conexión entre la interfaz y la base de datos
+  ```javascript
+  // Función para cargar datos históricos (index.php)
+  function renderHistoryChart() {
+      fetch('data.php')
+          .then(response => response.json())
+          .then(data => {
+              // Código para renderizar el gráfico con Chart.js
+          });
+  }
+  ```
+  
+  ```php
+  // Guardado de estado de ánimo (index.php)
+  if (isset($_POST['estado'])) {
+      $estado = $_POST['estado'];
+      $db->exec("INSERT INTO registros (estado_animo) VALUES ('$estado')");
+      echo "<p style='text-align:center;color:green;'>¡Guardado!</p>";
+  }
+  ```
+
+### 4. Pruebas
+
+- **Pruebas de Funcionalidad**: Verificación del correcto registro y visualización de datos
+- **Pruebas de Usabilidad**: Evaluación de la experiencia de usuario
+- **Pruebas de Compatibilidad**: Comprobación en diferentes navegadores y dispositivos
+- **Corrección de Errores**: Solución de problemas identificados durante las pruebas
+
+### 5. Despliegue
+
+- **Preparación para Producción**: Optimización del código y recursos
+  ```php
+  // Uso de CDN para bibliotecas externas (index.php)
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  // Estructura de archivos optimizada
+  // - index.php: Interfaz principal y lógica básica
+  // - data.php: API para datos JSON
+  // - style.css: Estilos separados
+  // - moodtracker.db: Base de datos SQLite
+  ```
+
+- **Documentación**: Creación del README y comentarios en el código
+  ```php
+  // Comentarios explicativos en el código (data.php)
+  // Consulta compatible con SQLite
+  $result = $db->query("
+      SELECT 
+          strftime('%W/%Y', fecha) as week,
+          /* Lógica para determinar el estado predominante */
+  ");
+  ```
+
+- **Despliegue Local**: Configuración para ejecutar la aplicación en entornos locales
+  ```bash
+  # Comando para iniciar un servidor PHP local
+  php -S localhost:8000
+  
+  # Estructura de directorios para despliegue
+  finalProject/
+  ├── index.php       # Archivo principal
+  ├── data.php        # API de datos
+  ├── style.css       # Estilos CSS
+  ├── moodtracker.db  # Base de datos
+  └── README.md       # Documentación
+  ```
+  
+  ```php
+  // Configuración para entorno de desarrollo (index.php)
+  // Seed de datos para pruebas
+  if ($db->querySingle("SELECT COUNT(*) FROM registros") == 0) {
+      $estados = ['😊', '😐', '😞'];
+      for ($i = 90; $i >= 0; $i--) {
+          $fecha = date('Y-m-d', strtotime("-$i days"));
+          $estado = $estados[array_rand($estados)];
+          $db->exec("INSERT INTO registros (fecha, estado_animo) VALUES ('$fecha', '$estado')");
+      }
+  }
+  ```
+
+### 6. Mantenimiento y Mejoras Futuras
+
+- **Monitoreo**: Seguimiento del funcionamiento de la aplicación
+- **Actualizaciones**: Plan para implementar nuevas funcionalidades como exportación de datos
+- **Optimización**: Mejoras continuas en rendimiento y experiencia de usuario
